@@ -6,7 +6,12 @@
 using namespace std;
 
 double ftest(double x){
-	return x*x+ x + 3.0;
+	return sin(x)*sin(x);
+	// return x*x+ x + 3.0;
+}
+
+void reweight(double *xi, double *wi, double *xinew, double *winew){
+	
 }
 
 int main(){
@@ -14,9 +19,8 @@ int main(){
 	double (*fx)(double);
 	fx=&ftest;
 
-	int N=100;
+	int N=60;
 
-	cout << fx(1) << endl;
 	cout << gausscheby(fx,N) << endl;
 
 }

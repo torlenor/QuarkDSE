@@ -7,6 +7,8 @@
 using namespace std;
 
 double gausscheby(double (*fx)(double), int N){
+	// Integration of sqrt(1-x^2)*fx(x)
+	
 	double x[N], w[N];
 	// build weights and x array
 	for(int i=0;i<N;i++){
