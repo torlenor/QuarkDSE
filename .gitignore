@@ -1,0 +1,14 @@
+*.data
+a.out
+*.swp
+bin/
+.DS_Store
+*.aux
+notes.pdf
+*.log
+*.out
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.pdf
+Makefile
