@@ -6,6 +6,22 @@
 
 using namespace std;
 
+template <class T>
+T IntSimpson(T *data, double h, int nData){
+        // extended Simpsons rule
+        T intvalue=0;
+        intvalue=data[0]/3.0;
+        for(int k=1;k<nData-1;k++){
+                if(k % 2 == 0){ 
+                        intvalue=intvalue+2.0*data[k]/3.0;
+                }else{
+                        intvalue=intvalue+4.0*data[k]/3.0;
+                }   
+        }   
+        intvalue=intvalue + data[nData-1]/3.0;
+        return intvalue*h;
+}
+
 double gausscheby(double (*fx)(double), int N){
 	// Integration of sqrt(1-x^2)*fx(x)
 	
