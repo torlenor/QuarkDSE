@@ -192,6 +192,9 @@ int main(int argc, char *argv[]){
 	// read output data
 	q.enqueueReadBuffer(b_Anew, CL_TRUE, 0, N*sizeof(cl_float), A);
 	q.enqueueReadBuffer(b_Bnew, CL_TRUE, 0, N*sizeof(cl_float), B);
+	
+	q.finish();
+	
 	cout << "\tdone!" << endl;
 
 	ofstream fout;
