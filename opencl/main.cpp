@@ -25,25 +25,6 @@ void mapping(float *xmap, float *wmap, float *x, float *w, float a, float b, flo
 	}
 }
 
-float angularA(float *args){
-	float x=args[0];
-	float y=args[1];
-	float z=args[2];
-	float w=args[3];
-
-	return 2.0/M_PI * (-2.0/3.0*y + (1 + y/x)*sqrt(x*y)*z - 4.0/3.0*y*z*z)
-		*exp(-(x+y-2*sqrt(x*y)*z)/(w*w));
-}
-float angularB(float *args){
-	float x=args[0];
-	float y=args[1];
-	float z=args[2];
-	float w=args[3];
-
-	return 2.0/M_PI * (x + y - 2.0*sqrt(x*y)*z)
-		*exp(-(x+y-2.0*sqrt(x*y)*z)/(w*w));
-}
-
 int main(int argc, char *argv[]){
 	// Parameters
 	float a=1E-4, b=1E5; // IR/UV cutoff
@@ -64,7 +45,7 @@ int main(int argc, char *argv[]){
 	int Nang=pow(2,7); // Number of discretized values for integration
 	float s=1; // Mapping parameter
 
-	cl::Buffer b_Anew, b_Bnew, b_A, b_B, b_xmap, b_wmap, b_angulardataA, b_angulardataB;
+	cl::Buffer b_Anew, b_Bnew, b_A, b_B, b_xmap, b_wmap, b_angx, b_angw, b_angulardataA, b_angulardataB;
 
 	// OpenCL initialization
 	// select platform and device
@@ -112,7 +93,7 @@ int main(int argc, char *argv[]){
 	cout << "Starting calculation... " << endl << endl;
 
 	// Integraten nodes and weights
-	float *xmap, *w, *wmap, *x, *dtmpa, angx, angw;
+	float *xmap, *w, *wmap, *x, *dtmpa, *angx, *angw;
 	x = new float[N];
 	xmap = new float[N];
 	w = new float[N];
@@ -151,12 +132,14 @@ int main(int argc, char *argv[]){
 	cout << "done!" << endl;
 
 	q.enqueueWriteBuffer(b_xmap, CL_TRUE, 0, N*sizeof(cl_float), xmap);
-	q.enqueueWriteBuffer(b_wmap, CL_TRUE, 0, N*sizeof(cl_float), wmap);	
+	q.enqueueWriteBuffer(b_wmap, CL_TRUE, 0, N*sizeof(cl_float), wmap);
+
+	q.enqueueWriteBuffer(b_angx, CL_TRUE, 0, Nang*sizeof(cl_float), angx);
+	q.enqueueWriteBuffer(b_angw, CL_TRUE, 0, Nang*sizeof(cl_float), angw);	
 
 	float args[4];
 
 	cout << "\tSetting kernel args... " << flush;
-	// execute the Gauss-Legendre Integration for A(x), B(x)
 	ker.setArg(0, b_Anew);
 	ker.setArg(1, b_Bnew);
 	ker.setArg(2, b_A);
@@ -169,20 +152,28 @@ int main(int argc, char *argv[]){
 	ker.setArg(9, omega);
 	ker.setArg(10, D);
 	ker.setArg(11, N);
+	angularker.setArg(0, b_angulardataA);
+	angularker.setArg(1, b_angulardataB);
+	angularker.setArg(2, b_xmap);
+	angularker.setArg(3, b_angx);
+	angularker.setArg(4, b_angw);
+	// Argument 5 has to be set later as xi element
+	angularker.setArg(6, omega);
+	angularker.setArg(7, N);
+	angularker.setArg(8, Nang);
 	cout << "\tdone!" << endl;
 
 	for(int i=0;i<iter;i++){
 		cout << "\t--- Iteration " << i+1 << " ---" << endl;
-		cout << "\tAngular integration on CPU... " << flush;
-		for(int xi=0;xi<N;xi++)
-			for(int yi=0;yi<N;yi++){
-				args[0]=xmap[xi];
-				args[1]=xmap[yi];
-				args[2]=0;
-				args[3]=omega;
-				angulardataA[xi + yi*N]=gausscheby(angularA, args, 2, Nang);
-				angulardataB[xi + yi*N]=gausscheby(angularB, args, 2, Nang);
+		cout << "\tAngular integration on GPU... " << flush;
+		for(int xi=0;xi<N;xi++){ // poor mans parallelization 
+				angularker.setArg(5, xi);
+				cl::Event eventang;
+				q.enqueueNDRangeKernel(angularker, cl::NullRange, cl::NDRange(N), cl::NDRange(64), NULL, &eventang);
 			}
+
+		q.enqueueReadBuffer(b_angulardataA, CL_TRUE, 0, N*N*sizeof(cl_float), angulardataA);
+		q.enqueueReadBuffer(b_angulardataB, CL_TRUE, 0, N*N*sizeof(cl_float), angulardataB);
 		cout << "\tdone!" << endl;
 
 		cout << "\tWriting buffers to GPU... " << flush;
