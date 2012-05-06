@@ -26,7 +26,7 @@ set(CMAKE_CXX_FLAGS "-O3")        ## Optimize
 # Add executable called "helloDemo" that is built from the source files
 # "demo.cxx" and "demo_b.cxx". The extensions are automatically found.
 # add_executable (calcalljack calcalljack.cpp calcint.cpp calcjack.cpp)
-add_executable (bin/tests tests.cpp)
+#add_executable (bin/tests tests.cpp)
 add_executable (bin/main_cpu main_cpu.cpp)
 
 # Link the executable to the Hello library.

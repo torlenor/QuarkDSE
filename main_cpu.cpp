@@ -53,8 +53,8 @@ int main(int argc, char *argv[]){
 	}
 
 	int iter=16; // How many iterations
-	int N=256; // Number of discretized values for integration
-	int Nang=pow(2,7); // Number of discretized values for integration
+	int N=pow(2,9); // Number of discretized values for integration
+	int Nang=pow(2,8); // Number of discretized values for integration
 	double s=1; // Mapping parameter
 
 	// Write parameters to stdout
@@ -74,12 +74,14 @@ int main(int argc, char *argv[]){
 	cout << "Starting calculation... " << flush;
 
 	// Integraten nodes and weights
-	double *xmap, *w, *wmap, *x, *dtmpa;
+	double *xmap, *w, *wmap, *x, *dtmpa, *angx, *angw;
 	x = new double[N];
 	xmap = new double[N];
 	w = new double[N];
 	wmap = new double[N];
 	dtmpa = new double[N];
+	angx = new double[Nang];
+	angw = new double[Nang];
 	
 	// Working variables
 	double *A, *Anew;
@@ -88,8 +90,8 @@ int main(int argc, char *argv[]){
 	B = new double[N];
 	Anew = new double[N];
 	Bnew = new double[N];
-	double angulardataA[N][N];
-	double angulardataB[N][N];
+	double *angulardataA = new double[N*N];
+	double *angulardataB = new double[N*N];
 
 	// Initialize initial arrays
 	for(int i=0;i<N;i++){
@@ -101,11 +103,12 @@ int main(int argc, char *argv[]){
 	memcpy(Bnew,B,sizeof(double)*N);
 
 	// Calculate weights, nodes and remap
-	// gauleg(0,1,x,w,N);
-	// gauleg(a,b,xmap,wmap,N);
 	gauleg(0,1,x,w,N);
-	// gauleg(-1,1,dtmpa,w,N);
 	mapping(xmap, wmap, x, w, a, b, s, N);
+	for(int j=0;j<Nang;j++){
+		angx[j]=cos((float)(j+1)/(float)(Nang+1+1) * M_PI);
+		angw[j]=M_PI/(float)(Nang+1+1)*pow(sin((float)(j+1)/(float)(Nang+1+1)*M_PI),2);
+	}
 	
 	double args[4];
 
@@ -116,8 +119,8 @@ int main(int argc, char *argv[]){
 				args[1]=xmap[yi];
 				args[2]=0;
 				args[3]=omega;
-				angulardataA[xi][yi]=gausscheby(angularA, args, 2, Nang);
-				angulardataB[xi][yi]=gausscheby(angularB, args, 2, Nang);
+				angulardataA[xi + yi*N]=gausscheby(angularA, args, 2, angx, angw, Nang);
+				angulardataB[xi + yi*N]=gausscheby(angularB, args, 2, angx, angw, Nang);
 			}
 
 		// Gauss-Legendre Integration for A(x), B(x)
@@ -126,9 +129,9 @@ int main(int argc, char *argv[]){
 			Bnew[xi]=m0;
 			for(int yi=0;yi<N;yi++){
 				Anew[xi]+=wmap[yi]*D/(omega*omega)*(xmap[yi]*A[yi]/(xmap[yi]*A[yi]*A[yi]+B[yi]*B[yi])
-						*angulardataA[xi][yi]);
+						*angulardataA[xi + yi*N]);
 				Bnew[xi]+=wmap[yi]*D/(omega*omega)*(xmap[yi]*B[yi]/(xmap[yi]*A[yi]*A[yi]+B[yi]*B[yi])
-						*angulardataB[xi][yi]);
+						*angulardataB[xi + yi*N]);
 			}
 		}
 

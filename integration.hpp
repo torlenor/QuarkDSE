@@ -77,16 +77,7 @@ T IntSimpson(T *data, double h, int nData){
 	return sum;
 } */
 
-double gausscheby(double (*fx)(double*), double *args, int i, int N){
-	// integration of sqrt(1-x^2)*fx(x)
-	
-	double x[N], w[N];
-	// build weights and x array
-	for(int j=0;j<N;j++){
-		x[j]=cos((double)(j+1)/(double)(N+1+1) * M_PI);
-		w[j]=M_PI/(double)(N+1+1)*pow(sin((double)(j+1)/(double)(N+1+1)*M_PI),2);
-	}
-
+double gausscheby(double (*fx)(double*), double *args, int i, double *x, double *w, int N){
 	double sum=0;
 	for(int n=0;n<N;n++){
 		args[i]=x[n];

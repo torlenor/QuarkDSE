@@ -17,8 +17,8 @@
 
 using namespace std;
 
-void mapping(float *xmap, float *wmap, float *x, float *w, float a, float b, float s, int N){
-	float g=log(1.0 + (b-a)/s);
+void mapping(float *xmap, float *wmap, float *x, float *w, double a, double b, double s, int N){
+	double g=log(1.0 + (b-a)/s);
 	for(int i=0;i<N;i++){
 		xmap[i]=a + s*(exp(g*x[i]) - 1.0)/(1.0 + exp(1) - exp(x[i]));
 		wmap[i]=w[i]*(s*g*exp(g*x[i]) + (xmap[i] - a)*exp(x[i]))/(1.0+exp(1.0)-exp(x[i]));
@@ -42,7 +42,7 @@ int main(int argc, char *argv[]){
 
 	int iter=16; // How many iterations
 	int N=pow(2,9); // Number of discretized values for integration
-	int Nang=pow(2,7); // Number of discretized values for integration
+	int Nang=pow(2,8); // Number of discretized values for integration
 	float s=1; // Mapping parameter
 
 	cl::Buffer b_Anew, b_Bnew, b_A, b_B, b_xmap, b_wmap, b_angx, b_angw, b_angulardataA, b_angulardataB;
@@ -66,18 +66,18 @@ int main(int argc, char *argv[]){
 	b_Bnew = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
 	b_A = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
 	b_B = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
-	b_xmap = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
-	b_wmap = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
-	b_angx = cl::Buffer(ctx, CL_MEM_READ_WRITE, Nang*sizeof(cl_float));
-	b_angw = cl::Buffer(ctx, CL_MEM_READ_WRITE, Nang*sizeof(cl_float));
+	b_xmap = cl::Buffer(ctx, CL_MEM_READ_ONLY, N*sizeof(cl_float));
+	b_wmap = cl::Buffer(ctx, CL_MEM_READ_ONLY, N*sizeof(cl_float));
+	b_angx = cl::Buffer(ctx, CL_MEM_READ_ONLY, Nang*sizeof(cl_float));
+	b_angw = cl::Buffer(ctx, CL_MEM_READ_ONLY, Nang*sizeof(cl_float));
 	b_angulardataA = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_float));
 	b_angulardataB = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_float));
 
-	// map arguments
+	cout << sizeof(cl_float) << endl;
 
 	// Main part of quark DSE
 	// Write parameters to stdout
-	cout << endl << "Quark DSE Solver on GPU/OpenCL v0.0" << endl;
+	cout << endl << "Quark DSE Solver on GPU/OpenCL v1.0" << endl;
 	cout << "(c) Hans-Peter Schadler" << endl << endl;
 	cout << "Physical parameter" << endl;
 	cout << "IR/UV cutoff: a=" << a << " b=" << b << endl;
@@ -163,6 +163,11 @@ int main(int argc, char *argv[]){
 	angularker.setArg(8, Nang);
 	cout << "\tdone!" << endl;
 
+	cout << "\tWriting buffers to GPU... " << flush;
+	q.enqueueWriteBuffer(b_A, CL_TRUE, 0, N*sizeof(cl_float), A);
+	q.enqueueWriteBuffer(b_B, CL_TRUE, 0, N*sizeof(cl_float), B);
+	cout << "\tdone!" << endl << endl;
+
 	for(int i=0;i<iter;i++){
 		cout << "\t--- Iteration " << i+1 << " ---" << endl;
 		cout << "\tAngular integration on GPU... " << flush;
@@ -172,31 +177,24 @@ int main(int argc, char *argv[]){
 				q.enqueueNDRangeKernel(angularker, cl::NullRange, cl::NDRange(N), cl::NDRange(64), NULL, &eventang);
 			}
 
-		q.enqueueReadBuffer(b_angulardataA, CL_TRUE, 0, N*N*sizeof(cl_float), angulardataA);
-		q.enqueueReadBuffer(b_angulardataB, CL_TRUE, 0, N*N*sizeof(cl_float), angulardataB);
-		cout << "\tdone!" << endl;
-
-		cout << "\tWriting buffers to GPU... " << flush;
-		q.enqueueWriteBuffer(b_A, CL_TRUE, 0, N*sizeof(cl_float), A);
-		q.enqueueWriteBuffer(b_B, CL_TRUE, 0, N*sizeof(cl_float), B);
-		q.enqueueWriteBuffer(b_angulardataA, CL_TRUE, 0, N*N*sizeof(cl_float), angulardataA);
-		q.enqueueWriteBuffer(b_angulardataB, CL_TRUE, 0, N*N*sizeof(cl_float), angulardataB);
 		cout << "\tdone!" << endl;
 
 		cout << "\tRadial integration on GPU... " << flush;
 		cl::Event event;
-		q.enqueueNDRangeKernel(ker, cl::NullRange, cl::NDRange(N), cl::NDRange(128), NULL, &event);
-		cout << "\tdone!" << endl;
-		
-		cout << "\tReading buffers from GPU... " << flush;
-		// read output data
-		q.enqueueReadBuffer(b_Anew, CL_TRUE, 0, N*sizeof(cl_float), Anew);
-		q.enqueueReadBuffer(b_Bnew, CL_TRUE, 0, N*sizeof(cl_float), Bnew);
+		q.enqueueNDRangeKernel(ker, cl::NullRange, cl::NDRange(N), cl::NDRange(64), NULL, &event);
 		cout << "\tdone!" << endl;
 
-		memcpy(A,Anew,sizeof(float)*N);
-		memcpy(B,Bnew,sizeof(float)*N);
+		cout << "\tCopying buffers around... " << flush;
+		q.enqueueCopyBuffer(b_Anew,b_A,0,0,N*sizeof(cl_float));
+		q.enqueueCopyBuffer(b_Bnew,b_B,0,0,N*sizeof(cl_float));
+		cout << "\tdone!" << endl;
 	}
+
+	cout << endl << "\tReading buffers from GPU... " << flush;
+	// read output data
+	q.enqueueReadBuffer(b_Anew, CL_TRUE, 0, N*sizeof(cl_float), A);
+	q.enqueueReadBuffer(b_Bnew, CL_TRUE, 0, N*sizeof(cl_float), B);
+	cout << "\tdone!" << endl;
 
 	ofstream fout;
 	fout.open("dressing.data");
