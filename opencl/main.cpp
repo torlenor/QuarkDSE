@@ -46,7 +46,7 @@ float angularB(float *args){
 
 int main(int argc, char *argv[]){
 	// Parameters
-	float a=1E-4, b=5E4; // IR/UV cutoff
+	float a=1E-4, b=1E5; // IR/UV cutoff
 	float D=16; // GeV^-2
 	float omega=0.5; // GeV
 	float A0=1, B0=0.4; // Initial values for A(x),B(x)
@@ -60,7 +60,7 @@ int main(int argc, char *argv[]){
 	}
 
 	int iter=16; // How many iterations
-	int N=pow(2,10); // Number of discretized values for integration
+	int N=pow(2,8); // Number of discretized values for integration
 	int Nang=pow(2,7); // Number of discretized values for integration
 	float s=1; // Mapping parameter
 
@@ -78,6 +78,8 @@ int main(int argc, char *argv[]){
 	LoadOpenCLKernel(kernel_str);
 	// select a main kernel function
 	ker = cl::Kernel(prog, "gausslegendreKernel");
+	angularker = cl::Kernel(prog, "angularKernel");
+
 	// allocate OpenCL buffers
 	b_Anew = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
 	b_Bnew = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
@@ -85,6 +87,8 @@ int main(int argc, char *argv[]){
 	b_B = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
 	b_xmap = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
 	b_wmap = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
+	b_angx = cl::Buffer(ctx, CL_MEM_READ_WRITE, Nang*sizeof(cl_float));
+	b_angw = cl::Buffer(ctx, CL_MEM_READ_WRITE, Nang*sizeof(cl_float));
 	b_angulardataA = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_float));
 	b_angulardataB = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_float));
 
@@ -108,12 +112,14 @@ int main(int argc, char *argv[]){
 	cout << "Starting calculation... " << endl << endl;
 
 	// Integraten nodes and weights
-	float *xmap, *w, *wmap, *x, *dtmpa;
+	float *xmap, *w, *wmap, *x, *dtmpa, angx, angw;
 	x = new float[N];
 	xmap = new float[N];
 	w = new float[N];
 	wmap = new float[N];
 	dtmpa = new float[N];
+	angx = new float[Nang];
+	angw = new float[Nang];
 	
 	// Working variables
 	float *A, *Anew;
@@ -138,6 +144,10 @@ int main(int argc, char *argv[]){
 	cout << "\tCalculating weights, notes and remap on CPU... " << flush;
 	gauleg(0,1,x,w,N);
 	mapping(xmap, wmap, x, w, a, b, s, N);
+	for(int j=0;j<Nang;j++){
+		angx[j]=cos((float)(j+1)/(float)(Nang+1+1) * M_PI);
+		angw[j]=M_PI/(float)(Nang+1+1)*pow(sin((float)(j+1)/(float)(Nang+1+1)*M_PI),2);
+	}
 	cout << "done!" << endl;
 
 	q.enqueueWriteBuffer(b_xmap, CL_TRUE, 0, N*sizeof(cl_float), xmap);
@@ -159,10 +169,10 @@ int main(int argc, char *argv[]){
 	ker.setArg(9, omega);
 	ker.setArg(10, D);
 	ker.setArg(11, N);
-	cout << "done!" << endl;
+	cout << "\tdone!" << endl;
 
 	for(int i=0;i<iter;i++){
-		cout << "\t--- Iteration " << i << " ---" << endl;
+		cout << "\t--- Iteration " << i+1 << " ---" << endl;
 		cout << "\tAngular integration on CPU... " << flush;
 		for(int xi=0;xi<N;xi++)
 			for(int yi=0;yi<N;yi++){
@@ -173,25 +183,25 @@ int main(int argc, char *argv[]){
 				angulardataA[xi + yi*N]=gausscheby(angularA, args, 2, Nang);
 				angulardataB[xi + yi*N]=gausscheby(angularB, args, 2, Nang);
 			}
-		cout << "done!" << endl;
+		cout << "\tdone!" << endl;
 
 		cout << "\tWriting buffers to GPU... " << flush;
 		q.enqueueWriteBuffer(b_A, CL_TRUE, 0, N*sizeof(cl_float), A);
 		q.enqueueWriteBuffer(b_B, CL_TRUE, 0, N*sizeof(cl_float), B);
 		q.enqueueWriteBuffer(b_angulardataA, CL_TRUE, 0, N*N*sizeof(cl_float), angulardataA);
 		q.enqueueWriteBuffer(b_angulardataB, CL_TRUE, 0, N*N*sizeof(cl_float), angulardataB);
-		cout << "done!" << endl;
+		cout << "\tdone!" << endl;
 
-		cout << "\tFiring up kernels on GPU... " << flush;
+		cout << "\tRadial integration on GPU... " << flush;
 		cl::Event event;
 		q.enqueueNDRangeKernel(ker, cl::NullRange, cl::NDRange(N), cl::NDRange(128), NULL, &event);
-		cout << "done!" << endl;
+		cout << "\tdone!" << endl;
 		
 		cout << "\tReading buffers from GPU... " << flush;
 		// read output data
 		q.enqueueReadBuffer(b_Anew, CL_TRUE, 0, N*sizeof(cl_float), Anew);
 		q.enqueueReadBuffer(b_Bnew, CL_TRUE, 0, N*sizeof(cl_float), Bnew);
-		cout << "done!" << endl;
+		cout << "\tdone!" << endl;
 
 		memcpy(A,Anew,sizeof(float)*N);
 		memcpy(B,Bnew,sizeof(float)*N);
@@ -205,7 +215,7 @@ int main(int argc, char *argv[]){
 	}
 	fout.close();
 
-	cout << endl << endl << "done" << endl;
+	cout << endl << endl << "Everything done!" << endl;
 
 	return 0;
 }

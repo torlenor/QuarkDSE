@@ -7,7 +7,7 @@ std::vector<cl::Device> devs;
 cl::Context ctx;
 cl::CommandQueue q;
 cl::Program prog;
-cl::Kernel ker;
+cl::Kernel ker, angularker;
 int current_device;
 
 void SetupDevice(unsigned int ip, unsigned int id)
