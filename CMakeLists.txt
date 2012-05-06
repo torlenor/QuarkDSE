@@ -30,4 +30,4 @@ add_executable (bin/tests tests.cpp)
 add_executable (bin/main_cpu main_cpu.cpp)
 
 # Link the executable to the Hello library.
-target_link_libraries (bin/main_cpu gsl blas) 
+# target_link_libraries (bin/main_cpu gsl blas) 

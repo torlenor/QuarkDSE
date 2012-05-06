@@ -4,15 +4,11 @@
 #include <cmath>
 #include <cstdlib>
 
-#include <gsl/gsl_sf_legendre.h>
+// #include <gsl/gsl_sf_legendre.h>
 
 #include "integration.hpp"
 
 using namespace std;
-
-double ftest(double x){
-	return sin(x)*sin(x);
-}
 
 void mapping(double *xmap, double *wmap, double *x, double *w, double a, double b, double s, int N){
 	double g=log(1.0 + (b-a)/s);

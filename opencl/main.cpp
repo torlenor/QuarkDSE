@@ -1,148 +1,212 @@
+#include <cstring>
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <cmath>
+#include <cstdlib>
+#include <sstream>
+
+#include <gsl/gsl_sf_legendre.h>
 
 #define __CL_ENABLE_EXCEPTIONS
 #include <CL/cl.hpp>
 
 #include "kernel.h"
 
+#include "cpufuncts.hpp"
+#include "gpufuncts.hpp"
+
 using namespace std;
 
-std::vector<cl::Platform> pl;
-std::vector<cl::Device> devs;
-cl::Context ctx;
-cl::CommandQueue q;
-cl::Program prog;
-cl::Kernel ker;
-cl::Buffer b_inputA, b_inputB, b_output;
-int current_device;
-
-void SetupDevice(unsigned int ip, unsigned int id);
-void LoadOpenCLKernel(const char *kernelfile);
-
-int main(int narg, char **argv)
-{
-  // select platform and device
-  if (narg != 3) {
-    SetupDevice(0, 0);
-  } else {
-    SetupDevice(atoi(argv[1]), atoi(argv[2]));
-  }
-
-  // load kernel string
-  LoadOpenCLKernel(kernel_str);
-
-  // Runtime paramters
-  int nSize = pow(2,20); // size of arrays for scalar product
-  std::cout << nSize << std::endl;
-
-  // select a main kernel function
-  ker = cl::Kernel(prog, "templateKernel");
-
-  // allocate two OpenCL buffers
-  b_output = cl::Buffer(ctx, CL_MEM_READ_WRITE, nSize*sizeof(cl_float));
-  b_inputA = cl::Buffer(ctx, CL_MEM_READ_WRITE, nSize*sizeof(cl_float));
-  b_inputB = cl::Buffer(ctx, CL_MEM_READ_WRITE, nSize*sizeof(cl_float));
-
-  // map arguments
-  ker.setArg(0, b_output);
-  ker.setArg(1, b_inputA);
-  ker.setArg(2, b_inputB);
-
-  // set "multiplier"
-//  unsigned int cc = 100;
-//  ker.setArg(2, (unsigned int)cc);
-
-  // write input data
-  float *inA = new float[nSize];
-  float *inB = new float[nSize];
-  for(int i = 0; i < nSize; i++) {
-    inA[i] = exp(-i/(double)100);
-    inB[i] = i + 1.0/(i+1);
-  }
-  q.enqueueWriteBuffer(b_inputA, CL_TRUE, 0, nSize*sizeof(cl_float), inA);
-  q.enqueueWriteBuffer(b_inputB, CL_TRUE, 0, nSize*sizeof(cl_float), inB);
-
-  cout << CL_DEVICE_MAX_WORK_GROUP_SIZE << endl;
-
-  // execute the kernel
-  double iter=1000;
-  cl::Event event;
-  for(int i=0;i<iter;i++){
-	  q.enqueueNDRangeKernel(ker, cl::NullRange, cl::NDRange(nSize), cl::NDRange(128), NULL, &event);
-  }
-
-  // read output data
-  float *out = new float[nSize];
-  q.enqueueReadBuffer(b_output, CL_TRUE, 0, nSize*sizeof(cl_float), out);
-
-  // verify results
-  float sum=0, sumhost=0;
-  for(int i = 0; i < nSize; i++) {
-	  sum+=out[i];
-	  sumhost+=inA[i]*inB[i];
-  }
-  std::cout << sum << " " << sumhost << std::endl; 
+void mapping(float *xmap, float *wmap, float *x, float *w, float a, float b, float s, int N){
+	float g=log(1.0 + (b-a)/s);
+	for(int i=0;i<N;i++){
+		xmap[i]=a + s*(exp(g*x[i]) - 1.0)/(1.0 + exp(1) - exp(x[i]));
+		wmap[i]=w[i]*(s*g*exp(g*x[i]) + (xmap[i] - a)*exp(x[i]))/(1.0+exp(1.0)-exp(x[i]));
+	}
 }
 
-void SetupDevice(unsigned int ip, unsigned int id)
-{
-  try {
-    cl::Platform::get(&pl);
+float angularA(float *args){
+	float x=args[0];
+	float y=args[1];
+	float z=args[2];
+	float w=args[3];
 
-    for(unsigned int i = 0; i < pl.size(); i++) {
-      std::cerr << "platform " << i << " " << pl[i].getInfo<CL_PLATFORM_NAME>().c_str() << " "
-	      << pl[i].getInfo<CL_PLATFORM_VERSION>().c_str() << "\n";    
-      pl[i].getDevices(CL_DEVICE_TYPE_ALL, &devs);
-      for(unsigned int j = 0; j < devs.size(); j++) {
-	std::cerr << "\tdevice " << j << " " << devs[j].getInfo<CL_DEVICE_NAME>().c_str() << "\n";
-      }
+	return 2.0/M_PI * (-2.0/3.0*y + (1 + y/x)*sqrt(x*y)*z - 4.0/3.0*y*z*z)
+		*exp(-(x+y-2*sqrt(x*y)*z)/(w*w));
+}
+float angularB(float *args){
+	float x=args[0];
+	float y=args[1];
+	float z=args[2];
+	float w=args[3];
 
-      cl::Context context(CL_DEVICE_TYPE_GPU);
-      std::vector<cl::Device> devs = context.getInfo<CL_CONTEXT_DEVICES>();
-      std::cerr << "I Found " << devs.size() << "\n";
-
-      cl::Context ctx2 = cl::Context(devs);
-      std::vector<cl::Device> devs2 = ctx2.getInfo<CL_CONTEXT_DEVICES>();
-      std::cerr << "I Found " << devs2.size() << "\n";
-    }
-    std::cerr << "\n"; 
-
-    if (pl.size() <= ip) throw cl::Error(-1, "FATAL: the specifed platform does not exist");
-    std::cerr << pl[ip].getInfo<CL_PLATFORM_NAME>().c_str() << " "
-	      << pl[ip].getInfo<CL_PLATFORM_VERSION>().c_str() << "::";    
-
-    pl[ip].getDevices(CL_DEVICE_TYPE_ALL, &devs);
-    if (devs.size() <= id) throw cl::Error(-1, "FATAL: the specifed device does not exist");
-    std::cerr << devs[id].getInfo<CL_DEVICE_NAME>().c_str() << "\n";
-
-    ctx = cl::Context(devs);
-    q = cl::CommandQueue(ctx, devs[id], CL_QUEUE_PROFILING_ENABLE);
-  }  catch( cl::Error e ) {
-    std::cerr << e.what() << ":" << e.err() << "\n";
-    std::cerr << "Abort!\n";
-    exit(-1);
-  }
-  current_device = id;
+	return 2.0/M_PI * (x + y - 2.0*sqrt(x*y)*z)
+		*exp(-(x+y-2.0*sqrt(x*y)*z)/(w*w));
 }
 
-void LoadOpenCLKernel(const char *kernelfile) 
-{
-  try {
-    cl::Program::Sources src(1, std::make_pair(kernelfile, strlen(kernelfile)));
-    prog = cl::Program(ctx, src);
+int main(int argc, char *argv[]){
+	// Parameters
+	float a=1E-4, b=5E4; // IR/UV cutoff
+	float D=16; // GeV^-2
+	float omega=0.5; // GeV
+	float A0=1, B0=0.4; // Initial values for A(x),B(x)
+	float m0=0;
 
-    std::stringstream options;
-    options << " -D__DUMMY_BUILD_OPTIONS__  ";
-    std::cerr << "Build options :: " << options.str() << "\n";
-    prog.build(devs, options.str().c_str());
-  }  catch( cl::Error e ) {
-    std::string log = prog.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devs[current_device]);
-    std::cerr << e.what() << ":" << e.err() << "\n";
-    std::cerr << kernelfile << "\n";
-    std::cerr << log << "\n";
-    exit(-1);
-  }
+	// Parameter from command line
+	if(argc<2){
+		m0=0;
+	}else{
+		m0=atof(argv[1]);
+	}
+
+	int iter=16; // How many iterations
+	int N=pow(2,10); // Number of discretized values for integration
+	int Nang=pow(2,7); // Number of discretized values for integration
+	float s=1; // Mapping parameter
+
+	cl::Buffer b_Anew, b_Bnew, b_A, b_B, b_xmap, b_wmap, b_angulardataA, b_angulardataB;
+
+	// OpenCL initialization
+	// select platform and device
+	if (argc != 4) {
+		SetupDevice(0, 0);
+	} else {
+		SetupDevice(atoi(argv[2]), atoi(argv[3]));
+	}
+
+	// load kernel string
+	LoadOpenCLKernel(kernel_str);
+	// select a main kernel function
+	ker = cl::Kernel(prog, "gausslegendreKernel");
+	// allocate OpenCL buffers
+	b_Anew = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
+	b_Bnew = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
+	b_A = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
+	b_B = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
+	b_xmap = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
+	b_wmap = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
+	b_angulardataA = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_float));
+	b_angulardataB = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_float));
+
+	// map arguments
+
+	// Main part of quark DSE
+	// Write parameters to stdout
+	cout << endl << "Quark DSE Solver on GPU/OpenCL v0.0" << endl;
+	cout << "(c) Hans-Peter Schadler" << endl << endl;
+	cout << "Physical parameter" << endl;
+	cout << "IR/UV cutoff: a=" << a << " b=" << b << endl;
+	cout << "D=" << D << endl;
+	cout << "Omega=" << omega << endl;
+	cout << "m0=" << m0 << endl << endl;
+	cout << "Numerical parameter" << endl;
+	cout << "Initial values: A0=" << A0 << " B0=" << B0 << endl;
+	cout << "Number of iterations: " << iter << endl;
+	cout << "Number of integration points: " << N << endl;
+	cout << "Number of angular integration points: " << Nang << endl << endl;
+
+	cout << "Starting calculation... " << endl << endl;
+
+	// Integraten nodes and weights
+	float *xmap, *w, *wmap, *x, *dtmpa;
+	x = new float[N];
+	xmap = new float[N];
+	w = new float[N];
+	wmap = new float[N];
+	dtmpa = new float[N];
+	
+	// Working variables
+	float *A, *Anew;
+	float *B, *Bnew;
+	A = new float[N];
+	B = new float[N];
+	Anew = new float[N];
+	Bnew = new float[N];
+	float *angulardataA = new float[N*N];
+	float *angulardataB = new float[N*N];
+
+	// Initialize initial arrays
+	for(int i=0;i<N;i++){
+		A[i]=A0;
+		B[i]=B0;
+	}
+
+	memcpy(Anew,A,sizeof(float)*N);
+	memcpy(Bnew,B,sizeof(float)*N);
+
+	// Calculate weights, nodes and remap
+	cout << "\tCalculating weights, notes and remap on CPU... " << flush;
+	gauleg(0,1,x,w,N);
+	mapping(xmap, wmap, x, w, a, b, s, N);
+	cout << "done!" << endl;
+
+	q.enqueueWriteBuffer(b_xmap, CL_TRUE, 0, N*sizeof(cl_float), xmap);
+	q.enqueueWriteBuffer(b_wmap, CL_TRUE, 0, N*sizeof(cl_float), wmap);	
+
+	float args[4];
+
+	cout << "\tSetting kernel args... " << flush;
+	// execute the Gauss-Legendre Integration for A(x), B(x)
+	ker.setArg(0, b_Anew);
+	ker.setArg(1, b_Bnew);
+	ker.setArg(2, b_A);
+	ker.setArg(3, b_B);
+	ker.setArg(4, b_angulardataA);
+	ker.setArg(5, b_angulardataB);
+	ker.setArg(6, b_xmap);
+	ker.setArg(7, b_wmap);
+	ker.setArg(8, m0);
+	ker.setArg(9, omega);
+	ker.setArg(10, D);
+	ker.setArg(11, N);
+	cout << "done!" << endl;
+
+	for(int i=0;i<iter;i++){
+		cout << "\t--- Iteration " << i << " ---" << endl;
+		cout << "\tAngular integration on CPU... " << flush;
+		for(int xi=0;xi<N;xi++)
+			for(int yi=0;yi<N;yi++){
+				args[0]=xmap[xi];
+				args[1]=xmap[yi];
+				args[2]=0;
+				args[3]=omega;
+				angulardataA[xi + yi*N]=gausscheby(angularA, args, 2, Nang);
+				angulardataB[xi + yi*N]=gausscheby(angularB, args, 2, Nang);
+			}
+		cout << "done!" << endl;
+
+		cout << "\tWriting buffers to GPU... " << flush;
+		q.enqueueWriteBuffer(b_A, CL_TRUE, 0, N*sizeof(cl_float), A);
+		q.enqueueWriteBuffer(b_B, CL_TRUE, 0, N*sizeof(cl_float), B);
+		q.enqueueWriteBuffer(b_angulardataA, CL_TRUE, 0, N*N*sizeof(cl_float), angulardataA);
+		q.enqueueWriteBuffer(b_angulardataB, CL_TRUE, 0, N*N*sizeof(cl_float), angulardataB);
+		cout << "done!" << endl;
+
+		cout << "\tFiring up kernels on GPU... " << flush;
+		cl::Event event;
+		q.enqueueNDRangeKernel(ker, cl::NullRange, cl::NDRange(N), cl::NDRange(128), NULL, &event);
+		cout << "done!" << endl;
+		
+		cout << "\tReading buffers from GPU... " << flush;
+		// read output data
+		q.enqueueReadBuffer(b_Anew, CL_TRUE, 0, N*sizeof(cl_float), Anew);
+		q.enqueueReadBuffer(b_Bnew, CL_TRUE, 0, N*sizeof(cl_float), Bnew);
+		cout << "done!" << endl;
+
+		memcpy(A,Anew,sizeof(float)*N);
+		memcpy(B,Bnew,sizeof(float)*N);
+	}
+
+	ofstream fout;
+	fout.open("dressing.data");
+
+	for(int xi=0;xi<N;xi++){
+		fout << xmap[xi] << " " << A[xi] << " " << B[xi] << " " << B[xi]/A[xi] << endl;
+	}
+	fout.close();
+
+	cout << endl << endl << "done" << endl;
+
+	return 0;
 }
+

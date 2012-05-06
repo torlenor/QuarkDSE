@@ -1,67 +1,14 @@
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <cmath>
+#ifndef GPUFUNCTS_HPP
+#define GPUFUNCTS_HPP
 
-#define __CL_ENABLE_EXCEPTIONS
-#include <CL/cl.hpp>
-
-#include "kernel.h"
-
-using namespace std;
-
+// Global OpenCL variables
 std::vector<cl::Platform> pl;
 std::vector<cl::Device> devs;
 cl::Context ctx;
 cl::CommandQueue q;
 cl::Program prog;
 cl::Kernel ker;
-cl::Buffer b_inputA, b_inputB, b_output;
 int current_device;
-
-void SetupDevice(unsigned int ip, unsigned int id);
-void LoadOpenCLKernel(const char *kernelfile);
-
-int main(int narg, char **argv)
-{
-  // select platform and device
-  if (narg != 3) {
-    SetupDevice(0, 0);
-  } else {
-    SetupDevice(atoi(argv[1]), atoi(argv[2]));
-  }
-
-  // load kernel string
-  LoadOpenCLKernel(kernel_str);
-
-  // Runtime paramters
-  int nSize = pow(2,20); // number of integration points
-  std::cout << nSize << std::endl;
-
-  // select a main kernel function
-  ker = cl::Kernel(prog, "gausschebyKernel");
-
-  // allocate two OpenCL buffers
-  b_output = cl::Buffer(ctx, CL_MEM_READ_WRITE, nSize*sizeof(cl_float));
-
-  // map arguments
-  ker.setArg(0, b_output);
-  ker.setArg(1, nSize);
-
-  // execute the kernel
-  cl::Event event;
-  q.enqueueNDRangeKernel(ker, cl::NullRange, cl::NDRange(nSize), cl::NDRange(128), NULL, &event);
-
-  // read output data
-  float *out = new float[nSize];
-  q.enqueueReadBuffer(b_output, CL_TRUE, 0, nSize*sizeof(cl_float), out);
-
-  float sum=0;
-  for(int i = 0; i < nSize; i++) {
-	  sum+=out[i];
-  }
-  std::cout << sum << " " << std::endl; 
-}
 
 void SetupDevice(unsigned int ip, unsigned int id)
 {
@@ -122,3 +69,5 @@ void LoadOpenCLKernel(const char *kernelfile)
     exit(-1);
   }
 }
+
+#endif /* GPUFUNCTS_HPP */
