@@ -39,7 +39,7 @@ double angularB(double *args){
 
 int main(int argc, char *argv[]){
 	// Parameters
-	double a=1E-4, b=5E4; // IR/UV cutoff
+	double a=1E-4, b=1E5; // IR/UV cutoff
 	double D=16; // GeV^-2
 	double omega=0.5; // GeV
 	double A0=1, B0=0.4; // Initial values for A(x),B(x)
@@ -54,6 +54,7 @@ int main(int argc, char *argv[]){
 
 	int iter=16; // How many iterations
 	int N=256; // Number of discretized values for integration
+	int Nang=pow(2,7); // Number of discretized values for integration
 	double s=1; // Mapping parameter
 
 	// Write parameters to stdout
@@ -67,7 +68,8 @@ int main(int argc, char *argv[]){
 	cout << "Numerical parameter" << endl;
 	cout << "Initial values: A0=" << A0 << " B0=" << B0 << endl;
 	cout << "Number of iterations: " << iter << endl;
-	cout << "Number of integration points: " << N << endl << endl;
+	cout << "Number of integration points: " << N << endl;
+	cout << "Number of angular integration points: " << Nang << endl << endl;
 
 	cout << "Starting calculation... " << flush;
 
@@ -114,8 +116,8 @@ int main(int argc, char *argv[]){
 				args[1]=xmap[yi];
 				args[2]=0;
 				args[3]=omega;
-				angulardataA[xi][yi]=gausscheby(angularA, args, 2, N);
-				angulardataB[xi][yi]=gausscheby(angularB, args, 2, N);
+				angulardataA[xi][yi]=gausscheby(angularA, args, 2, Nang);
+				angulardataB[xi][yi]=gausscheby(angularB, args, 2, Nang);
 			}
 
 		// Gauss-Legendre Integration for A(x), B(x)

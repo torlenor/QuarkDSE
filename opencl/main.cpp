@@ -41,7 +41,7 @@ int main(int argc, char *argv[]){
 	}
 
 	int iter=16; // How many iterations
-	int N=pow(2,8); // Number of discretized values for integration
+	int N=pow(2,9); // Number of discretized values for integration
 	int Nang=pow(2,7); // Number of discretized values for integration
 	float s=1; // Mapping parameter
 
