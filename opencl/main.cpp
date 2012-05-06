@@ -39,8 +39,8 @@ int main(int argc, char *argv[]){
 	}
 
 	int iter=16; // How many iterations
-	int N=pow(2,9); // Number of discretized values for integration
-	int Nang=pow(2,8); // Number of discretized values for integration
+	int N=pow(2,12); // Number of discretized values for integration
+	int Nang=pow(2,9); // Number of discretized values for integration
 	float s=1; // Mapping parameter
 
 	cl::Buffer b_Anew, b_Bnew, b_A, b_B, b_xmap, b_wmap, b_angx, b_angw, b_angulardataA, b_angulardataB;
@@ -186,6 +186,7 @@ int main(int argc, char *argv[]){
 		q.enqueueCopyBuffer(b_Anew,b_A,0,0,N*sizeof(cl_float));
 		q.enqueueCopyBuffer(b_Bnew,b_B,0,0,N*sizeof(cl_float));
 		cout << "\tdone!" << endl;
+		q.finish();
 	}
 
 	cout << endl << "\tReading buffers from GPU... " << flush;
