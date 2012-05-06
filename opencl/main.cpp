@@ -5,8 +5,6 @@
 #include <cstdlib>
 #include <sstream>
 
-#include <gsl/gsl_sf_legendre.h>
-
 #define __CL_ENABLE_EXCEPTIONS
 #include <CL/cl.hpp>
 
