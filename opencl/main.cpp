@@ -38,7 +38,7 @@ int main(int argc, char *argv[]){
 		m0=atof(argv[1]);
 	}
 
-	int iter=16; // How many iterations
+	int iter=30; // How many iterations
 	int N=pow(2,11); // Number of discretized values for integration
 	int Nang=pow(2,9); // Number of discretized values for integration
 	float s=1; // Mapping parameter
