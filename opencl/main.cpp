@@ -167,11 +167,12 @@ int main(int argc, char *argv[]){
 	cout << "\tdone!" << endl;
 
 	cout << "\tAngular integration on GPU... " << flush;
-	for(int xi=0;xi<N;xi++){ // poor mans parallelization 
-		angularker.setArg(5, xi);
+//	for(int xi=0;xi<N;xi++){ // poor mans parallelization 
+
+		angularker.setArg(5, 0);
 		cl::Event eventang;
 		q.enqueueNDRangeKernel(angularker, cl::NullRange, cl::NDRange(N), cl::NDRange(64), NULL, &eventang);
-	}
+//	}
 	cout << "\tdone!" << endl << endl;
 
 	for(int i=0;i<iter;i++){

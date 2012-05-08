@@ -35,10 +35,12 @@ __kernel void angularKernel(__global float *angulardataA, __global float *angula
 
 	float args[4];
 
-	args[0]=xmap[xi];
 	args[1]=xmap[tid];
 	args[2]=0;
 	args[3]=omega;
-	angulardataA[xi + tid*N]=gausschebyA(args, angx, angw, Nang);
-	angulardataB[xi + tid*N]=gausschebyB(args, angx, angw, Nang);
+	for(int xii=0;xii<N;xii++){
+		args[0]=xmap[xii];
+		angulardataA[xii + tid*N]=gausschebyA(args, angx, angw, Nang);
+		angulardataB[xii + tid*N]=gausschebyB(args, angx, angw, Nang);
+	}
 }
