@@ -159,23 +159,23 @@ int main(int argc, char *argv[]){
 	angularker.setArg(6, omega);
 	angularker.setArg(7, N);
 	angularker.setArg(8, Nang);
-	cout << "\tdone!" << endl;
+	cout << "\t\tdone!" << endl;
 
 	cout << "\tWriting buffers to GPU... " << flush;
 	q.enqueueWriteBuffer(b_A, CL_TRUE, 0, N*sizeof(cl_float), A);
 	q.enqueueWriteBuffer(b_B, CL_TRUE, 0, N*sizeof(cl_float), B);
+	cout << "\tdone!" << endl;
+
+	cout << "\tAngular integration on GPU... " << flush;
+	for(int xi=0;xi<N;xi++){ // poor mans parallelization 
+		angularker.setArg(5, xi);
+		cl::Event eventang;
+		q.enqueueNDRangeKernel(angularker, cl::NullRange, cl::NDRange(N), cl::NDRange(64), NULL, &eventang);
+	}
 	cout << "\tdone!" << endl << endl;
 
 	for(int i=0;i<iter;i++){
 		cout << "\t--- Iteration " << i+1 << " ---" << endl;
-		cout << "\tAngular integration on GPU... " << flush;
-		for(int xi=0;xi<N;xi++){ // poor mans parallelization 
-				angularker.setArg(5, xi);
-				cl::Event eventang;
-				q.enqueueNDRangeKernel(angularker, cl::NullRange, cl::NDRange(N), cl::NDRange(64), NULL, &eventang);
-			}
-
-		cout << "\tdone!" << endl;
 
 		cout << "\tRadial integration on GPU... " << flush;
 		cl::Event event;
