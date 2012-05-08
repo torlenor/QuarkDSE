@@ -42,7 +42,8 @@ void SetupDevice(unsigned int ip, unsigned int id)
     std::cerr << devs[id].getInfo<CL_DEVICE_NAME>().c_str() << "\n";
 
     ctx = cl::Context(devs);
-    q = cl::CommandQueue(ctx, devs[id], CL_QUEUE_PROFILING_ENABLE);
+    // q = cl::CommandQueue(ctx, devs[id], CL_QUEUE_PROFILING_ENABLE);
+    q = cl::CommandQueue(ctx, devs[id]);
   }  catch( cl::Error e ) {
     std::cerr << e.what() << ":" << e.err() << "\n";
     std::cerr << "Abort!\n";

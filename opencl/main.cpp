@@ -39,7 +39,7 @@ int main(int argc, char *argv[]){
 	}
 
 	int iter=30; // How many iterations
-	int N=pow(2,12); // Number of discretized values for integration
+	int N=pow(2,11); // Number of discretized values for integration
 	int Nang=pow(2,9); // Number of discretized values for integration
 	float s=1; // Mapping parameter
 
@@ -71,8 +71,6 @@ int main(int argc, char *argv[]){
 	b_angulardataA = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_float));
 	b_angulardataB = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_float));
 
-	cout << sizeof(cl_float) << endl;
-
 	// Main part of quark DSE
 	// Write parameters to stdout
 	cout << endl << "Quark DSE Solver on GPU/OpenCL v1.0" << endl;
@@ -91,22 +89,19 @@ int main(int argc, char *argv[]){
 	cout << "Starting calculation... " << endl << endl;
 
 	// Integraten nodes and weights
-	float *xmap, *w, *wmap, *x, *dtmpa, *angx, *angw;
-	x = new float[N];
-	xmap = new float[N];
-	w = new float[N];
-	wmap = new float[N];
-	dtmpa = new float[N];
-	angx = new float[Nang];
-	angw = new float[Nang];
+	float *x = new float[N];
+	float *xmap = new float[N];
+	float *w = new float[N];
+	float *wmap = new float[N];
+	float *dtmpa = new float[N];
+	float *angx = new float[Nang];
+	float *angw = new float[Nang];
 	
 	// Working variables
-	float *A, *Anew;
-	float *B, *Bnew;
-	A = new float[N];
-	B = new float[N];
-	Anew = new float[N];
-	Bnew = new float[N];
+	float *A = new float[N];
+	float *B = new float[N];
+	float *Anew = new float[N];
+	float *Bnew = new float[N];
 	float *angulardataA = new float[N*N];
 	float *angulardataB = new float[N*N];
 
@@ -124,8 +119,8 @@ int main(int argc, char *argv[]){
 	gauleg(0,1,x,w,N);
 	mapping(xmap, wmap, x, w, a, b, s, N);
 	for(int j=0;j<Nang;j++){
-		angx[j]=cos((float)(j+1)/(float)(Nang+1+1) * M_PI);
-		angw[j]=M_PI/(float)(Nang+1+1)*pow(sin((float)(j+1)/(float)(Nang+1+1)*M_PI),2);
+		angx[j]=cos((j+1.0)/(Nang+2.0) * M_PI);
+		angw[j]=M_PI/(Nang+2.0)*pow(sin((j+1.0)/(Nang+2.0)*M_PI),2);
 	}
 	cout << "done!" << endl;
 
@@ -147,9 +142,8 @@ int main(int argc, char *argv[]){
 	ker.setArg(6, b_xmap);
 	ker.setArg(7, b_wmap);
 	ker.setArg(8, m0);
-	ker.setArg(9, omega);
-	ker.setArg(10, D);
-	ker.setArg(11, N);
+	ker.setArg(9, D/(omega*omega));
+	ker.setArg(10, N);
 	angularker.setArg(0, b_angulardataA);
 	angularker.setArg(1, b_angulardataB);
 	angularker.setArg(2, b_xmap);
@@ -167,12 +161,9 @@ int main(int argc, char *argv[]){
 	cout << "\tdone!" << endl;
 
 	cout << "\tAngular integration on GPU... " << flush;
-//	for(int xi=0;xi<N;xi++){ // poor mans parallelization 
-
-		angularker.setArg(5, 0);
-		cl::Event eventang;
-		q.enqueueNDRangeKernel(angularker, cl::NullRange, cl::NDRange(N), cl::NDRange(64), NULL, &eventang);
-//	}
+	angularker.setArg(5, 0);
+	cl::Event eventang;
+	q.enqueueNDRangeKernel(angularker, cl::NullRange, cl::NDRange(N), cl::NDRange(64), NULL, &eventang);
 	cout << "\tdone!" << endl << endl;
 
 	for(int i=0;i<iter;i++){
