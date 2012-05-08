@@ -112,16 +112,17 @@ int main(int argc, char *argv[]){
 	
 	double args[4];
 
+	for(int xi=0;xi<N;xi++)
+		for(int yi=0;yi<N;yi++){
+			args[0]=xmap[xi];
+			args[1]=xmap[yi];
+			args[2]=0;
+			args[3]=omega;
+			angulardataA[xi + yi*N]=gausscheby(angularA, args, 2, angx, angw, Nang);
+			angulardataB[xi + yi*N]=gausscheby(angularB, args, 2, angx, angw, Nang);
+		}
+
 	for(int i=0;i<iter;i++){
-		for(int xi=0;xi<N;xi++)
-			for(int yi=0;yi<N;yi++){
-				args[0]=xmap[xi];
-				args[1]=xmap[yi];
-				args[2]=0;
-				args[3]=omega;
-				angulardataA[xi + yi*N]=gausscheby(angularA, args, 2, angx, angw, Nang);
-				angulardataB[xi + yi*N]=gausscheby(angularB, args, 2, angx, angw, Nang);
-			}
 
 		// Gauss-Legendre Integration for A(x), B(x)
 		for(int xi=0;xi<N;xi++){
