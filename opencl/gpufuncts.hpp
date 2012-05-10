@@ -1,6 +1,8 @@
 #ifndef GPUFUNCTS_HPP
 #define GPUFUNCTS_HPP
 
+#include <OpenCL/opencl.h>
+
 // Global OpenCL variables
 std::vector<cl::Platform> pl;
 std::vector<cl::Device> devs;
@@ -23,9 +25,9 @@ void SetupDevice(unsigned int ip, unsigned int id)
 	std::cerr << "\tdevice " << j << " " << devs[j].getInfo<CL_DEVICE_NAME>().c_str() << "\n";
       }
 
-      cl::Context context(CL_DEVICE_TYPE_GPU);
-      std::vector<cl::Device> devs = context.getInfo<CL_CONTEXT_DEVICES>();
-      std::cerr << "I Found " << devs.size() << "\n";
+     //  cl::Context context(CL_DEVICE_TYPE_CPU);
+     // std::vector<cl::Device> devs = context.getInfo<CL_CONTEXT_DEVICES>();
+     // std::cerr << "I Found " << devs.size() << "\n";
 
       cl::Context ctx2 = cl::Context(devs);
       std::vector<cl::Device> devs2 = ctx2.getInfo<CL_CONTEXT_DEVICES>();

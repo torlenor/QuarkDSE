@@ -4,7 +4,7 @@ set output "out_dressing.pdf"
 # set title "Gap equation"
 set logscale x
 #set xrange [0.0:40]
-#set yrange [0:600]
+set yrange [0:1.5]
 set xlabel "x" offset 0,0.3
 set ylabel "" offset 1.0,0
 
