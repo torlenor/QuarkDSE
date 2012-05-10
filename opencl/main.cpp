@@ -38,12 +38,14 @@ int main(int argc, char *argv[]){
 		m0=atof(argv[1]);
 	}
 
-	int iter=30; // How many iterations
-	int N=pow(2,11); // Number of discretized values for integration
+	int iter=50; // How many iterations
+	int N=pow(2,12); // Number of discretized values for integration
 	int Nang=pow(2,9); // Number of discretized values for integration
+	float eps=1E-6;
 	float s=1; // Mapping parameter
+	int wgsize=64; // Workgroup size
 
-	cl::Buffer b_Anew, b_Bnew, b_A, b_B, b_xmap, b_wmap, b_angx, b_angw, b_angulardataA, b_angulardataB;
+	cl::Buffer b_Anew, b_Bnew, b_A, b_B, b_xmap, b_wmap, b_angx, b_angw, b_angulardataA, b_angulardataB, b_epsA, b_epsB;
 
 	// OpenCL initialization
 	// select platform and device
@@ -51,7 +53,13 @@ int main(int argc, char *argv[]){
 		SetupDevice(0, 0);
 	} else {
 		SetupDevice(atoi(argv[2]), atoi(argv[3]));
+		if(argv[3]==0){
+			wgsize=64;
+		}else{
+			wgsize=1; 
+		}
 	}
+
 
 	// load kernel string
 	LoadOpenCLKernel(kernel_str);
@@ -70,6 +78,8 @@ int main(int argc, char *argv[]){
 	b_angw = cl::Buffer(ctx, CL_MEM_READ_ONLY, Nang*sizeof(cl_float));
 	b_angulardataA = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_float));
 	b_angulardataB = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_float));
+	b_epsA = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
+	b_epsB = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
 
 	// Main part of quark DSE
 	// Write parameters to stdout
@@ -104,6 +114,8 @@ int main(int argc, char *argv[]){
 	float *Bnew = new float[N];
 	float *angulardataA = new float[N*N];
 	float *angulardataB = new float[N*N];
+	float *epsA = new float[N];
+	float *epsB = new float[N];
 
 	// Initialize initial arrays
 	for(int i=0;i<N;i++){
@@ -144,6 +156,8 @@ int main(int argc, char *argv[]){
 	ker.setArg(8, m0);
 	ker.setArg(9, D/(omega*omega));
 	ker.setArg(10, N);
+	ker.setArg(11, b_epsA);
+	ker.setArg(12, b_epsB);
 	angularker.setArg(0, b_angulardataA);
 	angularker.setArg(1, b_angulardataB);
 	angularker.setArg(2, b_xmap);
@@ -163,21 +177,45 @@ int main(int argc, char *argv[]){
 	cout << "\tAngular integration on GPU... " << flush;
 	angularker.setArg(5, 0);
 	cl::Event eventang;
-	q.enqueueNDRangeKernel(angularker, cl::NullRange, cl::NDRange(N), cl::NDRange(64), NULL, &eventang);
+	q.enqueueNDRangeKernel(angularker, cl::NullRange, cl::NDRange(N), cl::NDRange(wgsize), NULL, &eventang);
 	cout << "\tdone!" << endl << endl;
+	
+	float epsmaxA=0;
+	float epsmaxB=0;
 
 	for(int i=0;i<iter;i++){
+		epsmaxA=0;
+		epsmaxB=0;
+
 		cout << "\t--- Iteration " << i+1 << " ---" << endl;
 
 		cout << "\tRadial integration on GPU... " << flush;
 		cl::Event event;
-		q.enqueueNDRangeKernel(ker, cl::NullRange, cl::NDRange(N), cl::NDRange(64), NULL, &event);
+		q.enqueueNDRangeKernel(ker, cl::NullRange, cl::NDRange(N), cl::NDRange(wgsize), NULL, &event);
 		cout << "\tdone!" << endl;
 
 		cout << "\tCopying buffers around... " << flush;
 		q.enqueueCopyBuffer(b_Anew,b_A,0,0,N*sizeof(cl_float));
 		q.enqueueCopyBuffer(b_Bnew,b_B,0,0,N*sizeof(cl_float));
 		cout << "\tdone!" << endl;
+		
+		cout << "\tCovergence check... " << endl;
+		q.enqueueReadBuffer(b_epsA, CL_TRUE, 0, N*sizeof(cl_float), epsA);
+		q.enqueueReadBuffer(b_epsB, CL_TRUE, 0, N*sizeof(cl_float), epsB);
+	
+		for(int i=0;i<N;i++){
+			if(epsA[i]>epsmaxA)
+				epsmaxA=epsA[i];	
+			if(epsB[i]>epsmaxB)
+				epsmaxB=epsB[i];	
+		}
+		
+		cout << "\tChange in A: "<< epsmaxA << " Change in B: " << epsmaxB << endl << endl;
+
+		if(epsmaxA<eps && epsmaxB<eps)
+			break;
+
+
 		q.finish();
 	}
 

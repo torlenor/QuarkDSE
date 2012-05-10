@@ -1,4 +1,4 @@
-__kernel void gausslegendreKernel(__global float *Anew,__global float *Bnew, __global const float *A, __global const float *B, __global const float *angulardataA, __global const float *angulardataB, __constant const float *xmap, __constant const float *wmap, const float m0, const float Ddomegasquared, const int N){
+__kernel void gausslegendreKernel(__global float *Anew,__global float *Bnew, __global const float *A, __global const float *B, __global const float *angulardataA, __global const float *angulardataB, __constant const float *xmap, __constant const float *wmap, const float m0, const float Ddomegasquared, const int N, __global float *epsA, __global float *epsB){
 	const uint tid = get_global_id(0);
 
 	float Asum=1.0;
@@ -16,6 +16,9 @@ __kernel void gausslegendreKernel(__global float *Anew,__global float *Bnew, __g
 	}
 	Anew[tid]=Asum;
 	Bnew[tid]=Bsum;
+
+	epsA[tid]=sqrt(pow(A[tid]-Asum,2));
+	epsB[tid]=sqrt(pow(B[tid]-Bsum,2));
 }
 
 float gausschebyA(__local const float *args, __constant const float *angx, __constant const float *angw, const int N){
