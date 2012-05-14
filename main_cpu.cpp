@@ -37,6 +37,30 @@ double angularB(double *args){
 		*exp(-(x+y-2.0*sqrt(x*y)*z)/(w*w));
 }
 
+bool convtest(double *A, double *B, double *Anew, double *Bnew, double eps, int N){
+	double maxdeltaA=-0.1, maxdeltaB=-0.1;
+
+	double absA,absB, tmp;
+
+	for(int i=0;i<N;i++){
+		tmp=abs(A[i]-Anew[i]);
+		if(tmp>maxdeltaA)
+			maxdeltaA=tmp;
+
+		tmp=abs(B[i]-Bnew[i]);
+		if(tmp>maxdeltaB)
+			maxdeltaB=tmp;
+	}
+
+	cout << "maxdeltaA=" << maxdeltaA << " maxdeltaB=" << maxdeltaB << endl;
+
+	if(maxdeltaA<eps && maxdeltaB<eps){
+		return true;
+	}else{
+		return false;
+	}
+}
+
 int main(int argc, char *argv[]){
 	// Parameters
 	double a=1E-4, b=1E5; // IR/UV cutoff
@@ -52,10 +76,11 @@ int main(int argc, char *argv[]){
 		m0=atof(argv[1]);
 	}
 
-	int iter=16; // How many iterations
-	int N=pow(2,11); // Number of discretized values for integration
-	int Nang=pow(2,9); // Number of discretized values for integration
+	int iter=100; // How many iterations
+	int N=pow(2,9); // Number of discretized values for integration
+	int Nang=pow(2,11); // Number of discretized values for integration
 	double s=1; // Mapping parameter
+	double eps=1E-10;
 
 	// Write parameters to stdout
 	cout << "Quark DSE Solver on CPU v1.0" << endl;
@@ -71,7 +96,7 @@ int main(int argc, char *argv[]){
 	cout << "Number of integration points: " << N << endl;
 	cout << "Number of angular integration points: " << Nang << endl << endl;
 
-	cout << "Starting calculation... " << flush;
+	cout << "Starting calculation... " << endl;
 
 	// Integraten nodes and weights
 	double *xmap, *w, *wmap, *x, *dtmpa, *angx, *angw;
@@ -112,6 +137,10 @@ int main(int argc, char *argv[]){
 	
 	double args[4];
 
+	bool test;
+
+	cout << "Angular integration... " << flush;
+
 	for(int xi=0;xi<N;xi++)
 		for(int yi=0;yi<N;yi++){
 			args[0]=xmap[xi];
@@ -122,8 +151,11 @@ int main(int argc, char *argv[]){
 			angulardataB[xi + yi*N]=gausscheby(angularB, args, 2, angx, angw, Nang);
 		}
 
+	cout << "done!" << endl;
+	double cnt=0;
 	for(int i=0;i<iter;i++){
-
+		cnt++;
+		cout << endl << "Iteration " << cnt << endl;
 		// Gauss-Legendre Integration for A(x), B(x)
 		for(int xi=0;xi<N;xi++){
 			Anew[xi]=1.0;
@@ -135,6 +167,12 @@ int main(int argc, char *argv[]){
 						*angulardataB[xi + yi*N]);
 			}
 		}
+		//Convergence check
+
+		test = convtest(A,B,Anew,Bnew,eps,N);
+
+		if(test==true)
+			break;
 
 		memcpy(A,Anew,sizeof(double)*N);
 		memcpy(B,Bnew,sizeof(double)*N);
@@ -148,7 +186,7 @@ int main(int argc, char *argv[]){
 	}
 	fout.close();
 
-	cout << "done" << endl;
+	cout << endl << "Done!" << endl;
 
 	return 0;
 }
