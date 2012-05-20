@@ -6,7 +6,8 @@
 #include <sstream>
 
 #define __CL_ENABLE_EXCEPTIONS
-#include <CL/cl.hpp>
+// #include <CL/cl.hpp>
+#include "include/cl.hpp"
 
 #include "kernel.h"
 
@@ -39,9 +40,9 @@ int main(int argc, char *argv[]){
 	}
 
 	int iter=50; // How many iterations
-	int N=pow(2,9); // Number of discretized values for integration
-	int Nang=pow(2,11); // Number of discretized values for integration
-	float eps=1E-6;
+	int N=pow((float)2,9); // Number of discretized values for integration
+	int Nang=pow((float)2,7); // Number of discretized values for integration
+	float eps=1E-7;
 	float s=1; // Mapping parameter
 	int wgsize=64; // Workgroup size
 
@@ -53,7 +54,7 @@ int main(int argc, char *argv[]){
 		SetupDevice(0, 0);
 	} else {
 		SetupDevice(atoi(argv[2]), atoi(argv[3]));
-		if(atoi(argv[3])==0){
+		if(argv[3]==0){
 			wgsize=64;
 		}else{
 			wgsize=1; 

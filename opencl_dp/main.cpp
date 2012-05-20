@@ -15,7 +15,7 @@
 
 using namespace std;
 
-void mapping(float *xmap, float *wmap, float *x, float *w, double a, double b, double s, int N){
+void mapping(double *xmap, double *wmap, double *x, double *w, double a, double b, double s, int N){
 	double g=log(1.0 + (b-a)/s);
 	for(int i=0;i<N;i++){
 		xmap[i]=a + s*(exp(g*x[i]) - 1.0)/(1.0 + exp(1) - exp(x[i]));
@@ -25,11 +25,11 @@ void mapping(float *xmap, float *wmap, float *x, float *w, double a, double b, d
 
 int main(int argc, char *argv[]){
 	// Parameters
-	float a=1E-4, b=1E5; // IR/UV cutoff
-	float D=16; // GeV^-2
-	float omega=0.5; // GeV
-	float A0=1, B0=0.4; // Initial values for A(x),B(x)
-	float m0=0;
+	double a=1E-4, b=1E5; // IR/UV cutoff
+	double D=16; // GeV^-2
+	double omega=0.5; // GeV
+	double A0=1, B0=0.4; // Initial values for A(x),B(x)
+	double m0=0;
 
 	// Parameter from command line
 	if(argc<2){
@@ -38,11 +38,11 @@ int main(int argc, char *argv[]){
 		m0=atof(argv[1]);
 	}
 
-	int iter=50; // How many iterations
-	int N=pow(2,9); // Number of discretized values for integration
+	int iter=100; // Maximum number of iterations
+	int N=pow(2,12); // Number of discretized values for integration
 	int Nang=pow(2,11); // Number of discretized values for integration
-	float eps=1E-6;
-	float s=1; // Mapping parameter
+	double eps=1E-10;
+	double s=1; // Mapping parameter
 	int wgsize=64; // Workgroup size
 
 	cl::Buffer b_Anew, b_Bnew, b_A, b_B, b_xmap, b_wmap, b_angx, b_angw, b_angulardataA, b_angulardataB, b_epsA, b_epsB;
@@ -68,18 +68,18 @@ int main(int argc, char *argv[]){
 	angularker = cl::Kernel(prog, "angularKernel");
 
 	// allocate OpenCL buffers
-	b_Anew = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
-	b_Bnew = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
-	b_A = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
-	b_B = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
-	b_xmap = cl::Buffer(ctx, CL_MEM_READ_ONLY, N*sizeof(cl_float));
-	b_wmap = cl::Buffer(ctx, CL_MEM_READ_ONLY, N*sizeof(cl_float));
-	b_angx = cl::Buffer(ctx, CL_MEM_READ_ONLY, Nang*sizeof(cl_float));
-	b_angw = cl::Buffer(ctx, CL_MEM_READ_ONLY, Nang*sizeof(cl_float));
-	b_angulardataA = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_float));
-	b_angulardataB = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_float));
-	b_epsA = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
-	b_epsB = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_float));
+	b_Anew = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_double));
+	b_Bnew = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_double));
+	b_A = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_double));
+	b_B = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_double));
+	b_xmap = cl::Buffer(ctx, CL_MEM_READ_ONLY, N*sizeof(cl_double));
+	b_wmap = cl::Buffer(ctx, CL_MEM_READ_ONLY, N*sizeof(cl_double));
+	b_angx = cl::Buffer(ctx, CL_MEM_READ_ONLY, Nang*sizeof(cl_double));
+	b_angw = cl::Buffer(ctx, CL_MEM_READ_ONLY, Nang*sizeof(cl_double));
+	b_angulardataA = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_double));
+	b_angulardataB = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*N*sizeof(cl_double));
+	b_epsA = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_double));
+	b_epsB = cl::Buffer(ctx, CL_MEM_READ_WRITE, N*sizeof(cl_double));
 
 	// Main part of quark DSE
 	// Write parameters to stdout
@@ -99,23 +99,23 @@ int main(int argc, char *argv[]){
 	cout << "Starting calculation... " << endl << endl;
 
 	// Integraten nodes and weights
-	float *x = new float[N];
-	float *xmap = new float[N];
-	float *w = new float[N];
-	float *wmap = new float[N];
-	float *dtmpa = new float[N];
-	float *angx = new float[Nang];
-	float *angw = new float[Nang];
+	double *x = new double[N];
+	double *xmap = new double[N];
+	double *w = new double[N];
+	double *wmap = new double[N];
+	double *dtmpa = new double[N];
+	double *angx = new double[Nang];
+	double *angw = new double[Nang];
 	
 	// Working variables
-	float *A = new float[N];
-	float *B = new float[N];
-	float *Anew = new float[N];
-	float *Bnew = new float[N];
-	float *angulardataA = new float[N*N];
-	float *angulardataB = new float[N*N];
-	float *epsA = new float[N];
-	float *epsB = new float[N];
+	double *A = new double[N];
+	double *B = new double[N];
+	double *Anew = new double[N];
+	double *Bnew = new double[N];
+	double *angulardataA = new double[N*N];
+	double *angulardataB = new double[N*N];
+	double *epsA = new double[N];
+	double *epsB = new double[N];
 
 	// Initialize initial arrays
 	for(int i=0;i<N;i++){
@@ -123,8 +123,8 @@ int main(int argc, char *argv[]){
 		B[i]=B0;
 	}
 
-	memcpy(Anew,A,sizeof(float)*N);
-	memcpy(Bnew,B,sizeof(float)*N);
+	memcpy(Anew,A,sizeof(double)*N);
+	memcpy(Bnew,B,sizeof(double)*N);
 
 	// Calculate weights, nodes and remap
 	cout << "\tCalculating weights, notes and remap on CPU... " << flush;
@@ -136,13 +136,13 @@ int main(int argc, char *argv[]){
 	}
 	cout << "done!" << endl;
 
-	q.enqueueWriteBuffer(b_xmap, CL_TRUE, 0, N*sizeof(cl_float), xmap);
-	q.enqueueWriteBuffer(b_wmap, CL_TRUE, 0, N*sizeof(cl_float), wmap);
+	q.enqueueWriteBuffer(b_xmap, CL_TRUE, 0, N*sizeof(cl_double), xmap);
+	q.enqueueWriteBuffer(b_wmap, CL_TRUE, 0, N*sizeof(cl_double), wmap);
 
-	q.enqueueWriteBuffer(b_angx, CL_TRUE, 0, Nang*sizeof(cl_float), angx);
-	q.enqueueWriteBuffer(b_angw, CL_TRUE, 0, Nang*sizeof(cl_float), angw);	
+	q.enqueueWriteBuffer(b_angx, CL_TRUE, 0, Nang*sizeof(cl_double), angx);
+	q.enqueueWriteBuffer(b_angw, CL_TRUE, 0, Nang*sizeof(cl_double), angw);	
 
-	float args[4];
+	double args[4];
 
 	cout << "\tSetting kernel args... " << flush;
 	ker.setArg(0, b_Anew);
@@ -170,8 +170,8 @@ int main(int argc, char *argv[]){
 	cout << "\t\tdone!" << endl;
 
 	cout << "\tWriting buffers to GPU... " << flush;
-	q.enqueueWriteBuffer(b_A, CL_TRUE, 0, N*sizeof(cl_float), A);
-	q.enqueueWriteBuffer(b_B, CL_TRUE, 0, N*sizeof(cl_float), B);
+	q.enqueueWriteBuffer(b_A, CL_TRUE, 0, N*sizeof(cl_double), A);
+	q.enqueueWriteBuffer(b_B, CL_TRUE, 0, N*sizeof(cl_double), B);
 	cout << "\tdone!" << endl;
 
 	cout << "\tAngular integration on GPU... " << flush;
@@ -180,8 +180,8 @@ int main(int argc, char *argv[]){
 	q.enqueueNDRangeKernel(angularker, cl::NullRange, cl::NDRange(N), cl::NDRange(wgsize), NULL, &eventang);
 	cout << "\tdone!" << endl << endl;
 	
-	float epsmaxA=0;
-	float epsmaxB=0;
+	double epsmaxA=0;
+	double epsmaxB=0;
 
 	for(int i=0;i<iter;i++){
 		epsmaxA=0;
@@ -195,13 +195,13 @@ int main(int argc, char *argv[]){
 		cout << "\tdone!" << endl;
 
 		cout << "\tCopying buffers around... " << flush;
-		q.enqueueCopyBuffer(b_Anew,b_A,0,0,N*sizeof(cl_float));
-		q.enqueueCopyBuffer(b_Bnew,b_B,0,0,N*sizeof(cl_float));
+		q.enqueueCopyBuffer(b_Anew,b_A,0,0,N*sizeof(cl_double));
+		q.enqueueCopyBuffer(b_Bnew,b_B,0,0,N*sizeof(cl_double));
 		cout << "\tdone!" << endl;
 		
 		cout << "\tCovergence check... " << endl;
-		q.enqueueReadBuffer(b_epsA, CL_TRUE, 0, N*sizeof(cl_float), epsA);
-		q.enqueueReadBuffer(b_epsB, CL_TRUE, 0, N*sizeof(cl_float), epsB);
+		q.enqueueReadBuffer(b_epsA, CL_TRUE, 0, N*sizeof(cl_double), epsA);
+		q.enqueueReadBuffer(b_epsB, CL_TRUE, 0, N*sizeof(cl_double), epsB);
 	
 		for(int i=0;i<N;i++){
 			if(epsA[i]>epsmaxA)
@@ -221,8 +221,8 @@ int main(int argc, char *argv[]){
 
 	cout << endl << "\tReading buffers from GPU... " << flush;
 	// read output data
-	q.enqueueReadBuffer(b_Anew, CL_TRUE, 0, N*sizeof(cl_float), A);
-	q.enqueueReadBuffer(b_Bnew, CL_TRUE, 0, N*sizeof(cl_float), B);
+	q.enqueueReadBuffer(b_Anew, CL_TRUE, 0, N*sizeof(cl_double), A);
+	q.enqueueReadBuffer(b_Bnew, CL_TRUE, 0, N*sizeof(cl_double), B);
 	
 	q.finish();
 	
