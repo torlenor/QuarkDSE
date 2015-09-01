@@ -4,3 +4,8 @@ project was part of a lecture about numerical methods in particle physics.
 
 What the code does is, it solves a system of coupled integral equations using 
 Gauss-Legendre and Gauss-Tschebyshev integration.
+
+See for example
+R.~Alkofer, P.~Watson and H.~Weigel, Phys. Rev. D 65, 094026 (2002),
+[arXiv:hep-ph/0202053]; 
+and the file Project_Instructions.pdf
