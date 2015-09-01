@@ -1,0 +1,6 @@
+Implementation of dressing function calculation for a quark propagator DSE. 
+The implementation is once done for CPU and also for GPU using OpenCL. This 
+project was part of a lecture about numerical methods in particle physics. 
+
+What the code does is, it solves a system of coupled integral equations using 
+Gauss-Legendre and Gauss-Tschebyshev integration.
